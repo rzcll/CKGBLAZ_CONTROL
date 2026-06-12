@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin Spreadsheet</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .loader { border: 3px solid #e2e8f0; border-top: 3px solid #4f46e5; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Efek Glass untuk Navbar */
+        .glass-nav { background: rgba(79, 70, 229, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        /* Custom Scrollbar untuk tabel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-100/95 backdrop-blur-md transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
+            <div class="flex justify-center mb-6">
+                <div class="bg-indigo-100 p-4 rounded-full text-indigo-600 shadow-inner">
+                    <i class="ph ph-shield-check text-5xl"></i>
+                </div>
+            </div>
+            <h2 class="text-2xl font-bold text-center text-slate-800 mb-2">Akses Keamanan</h2>
+            <p class="text-center text-slate-500 mb-6 text-sm">Masukkan username admin Anda untuk melanjutkan.</p>
+            
+            <div id="loginAlert" class="hidden mb-4 p-3 rounded-xl text-sm bg-red-50 text-red-700 border border-red-200 text-center font-medium"></div>
+
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Username Admin</label>
+                <input type="password" id="loginUsername" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-700 font-semibold" placeholder="Ketik username..." onkeypress="if(event.key === 'Enter') handleLogin()">
+            </div>
+            <button id="btnLogin" onclick="handleLogin()" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 flex justify-center items-center gap-2">
+                <i class="ph ph-sign-in text-xl"></i> Masuk Dashboard
+            </button>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="glass-nav text-white shadow-lg p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-xl backdrop-blur-sm shadow-inner">
+                    <i class="ph ph-database text-2xl"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-wide">DataSpace<span class="font-normal opacity-80 text-sm ml-2 hidden md:inline">Management Dashboard</span></h1>
+            </div>
+            <div class="flex items-center gap-2 text-sm font-semibold bg-white/10 px-4 py-2 rounded-full border border-white/20 shadow-sm">
+                <span class="relative flex h-2.5 w-2.5">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+                Live Sync
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 md:p-8 w-full max-w-7xl mx-auto space-y-6">
+        
+        <!-- Alert Notification -->
+        <div id="alertBox" class="hidden p-4 rounded-xl text-sm items-center gap-3 shadow-sm transform transition-all duration-300"></div>
+
+        <!-- Banner Waktu Habis (Otomatis Muncul) -->
+        <div id="expiredBanner" class="hidden bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex-col sm:flex-row justify-between items-center gap-4 shadow-sm transition-all">
+            <div class="flex items-center gap-3">
+                <div class="bg-red-100 p-2 rounded-full">
+                    <i class="ph ph-warning-circle text-2xl text-red-600"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-red-800">Peringatan Tenggat Waktu</h3>
+                    <p class="text-sm">Terdapat <span id="expiredCount" class="font-bold">0</span> baris data yang batas waktunya telah habis atau sudah mencapai hari ini.</p>
+                </div>
+            </div>
+            <button id="btnCleanExpired" onclick="autoCleanExpired()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm whitespace-nowrap outline-none focus:ring-2 focus:ring-red-500 active:scale-95">
+                Hapus Semua Kadaluarsa
+            </button>
+        </div>
+
+        <!-- Table Container -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">Tabel Data Spreadsheet</h2>
+                    <p class="text-sm text-slate-500">Kelola dan update data secara real-time</p>
+                </div>
+                <button onclick="addNewRowUI()" 
+                        class="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 shadow hover:shadow-md active:scale-95 outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    <i class="ph ph-plus-circle text-xl"></i> Tambah Baris Baru
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto pb-12">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100/80 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
+                            <th class="p-4 w-16 text-center">#</th>
+                            <th class="p-4">Akun (Kolom A)</th>
+                            <th class="p-4">Kolom B</th>
+                            <th class="p-4">Kolom C</th>
+                            <th class="p-4">Kolom D</th>
+                            <th class="p-4">Batas Waktu (Kolom E)</th>
+                            <th class="p-4 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="text-sm divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="7" class="p-16 text-center text-slate-400">
+                                <i class="ph ph-spinner-gap text-5xl mb-3 block text-indigo-400 animate-spin w-max mx-auto"></i>
+                                <p class="font-medium">Memuat data dari server...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbya7z3VYbd6gGpLkw2OxCH8U8I3bxuJBf2Zgjhb_cYFgr1mAKwqA0FGvRSEp8Uq_Owo_Q/exec';
+        let currentData = [];
+
+        // Hapus pemanggilan otomatis loadData() karena akan dipanggil setelah login berhasil
+        // document.addEventListener("DOMContentLoaded", loadData);
+
+        // --- FUNGSI LOGIN ADMIN ---
+        async function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const btn = document.getElementById('btnLogin');
+            const alert = document.getElementById('loginAlert');
+            
+            if (!username) {
+                alert.innerText = "Username tidak boleh kosong!";
+                alert.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                alert.classList.add('hidden');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<div class="loader" style="width:20px;height:20px;border-color:#e0e7ff;border-top-color:transparent;border-width:3px"></div> <span class="ml-2">Memeriksa...</span>';
+                btn.disabled = true;
+
+                const res = await sendToGas({
+                    action: 'loginAdmin',
+                    username: username
+                });
+
+                if (res.status === 'success') {
+                    // Berhasil login: Fade out layar login lalu muat data tabel
+                    const overlay = document.getElementById('loginOverlay');
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.remove();
+                        loadData(); // Panggil data setelah layar login tertutup
+                    }, 300);
+                } else {
+                    alert.innerText = res.message || "Username tidak valid!";
+                    alert.classList.remove('hidden');
+                    btn.innerHTML = '<i class="ph ph-sign-in text-xl"></i> Masuk Dashboard';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert.innerText = "Koneksi ke server gagal.";
+                alert.classList.remove('hidden');
+                btn.innerHTML = '<i class="ph ph-sign-in text-xl"></i> Masuk Dashboard';
+                btn.disabled = false;
+            }
+        }
+
+        // --- FUNGSI PARSING & FORMAT TANGGAL ---
+        function parseDateData(rawDate) {
+            if (!rawDate) return null;
+            let d = new Date(rawDate);
+            if (!isNaN(d.getTime())) return d;
+            
+            if (typeof rawDate === 'string') {
+                const parts = rawDate.split(/[\/\-]/);
+                if (parts.length === 3) {
+                    if (parts[2].length === 4) { // Asumsi DD/MM/YYYY
+                        d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
+                    } else if (parts[0].length === 4) { // Asumsi YYYY-MM-DD
+                        d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
+                    }
+                    if (!isNaN(d.getTime())) return d;
+                }
+            }
+            return null;
+        }
+
+        function showAlert(message, type = 'success') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `mb-4 p-4 rounded-xl text-sm flex items-center gap-3 shadow-sm transform transition-all duration-300 ${type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`;
+            const icon = type === 'success' ? '<i class="ph ph-check-circle text-2xl"></i>' : '<i class="ph ph-warning-circle text-2xl"></i>';
+            alertBox.innerHTML = `${icon} <span class="font-medium">${message}</span>`;
+            alertBox.style.display = 'flex';
+            setTimeout(() => { alertBox.style.display = 'none'; }, 4000);
+        }
+
+        async function sendToGas(payload) {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            return await response.json();
+        }
+
+        async function loadData() {
+            try {
+                document.getElementById('tableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-16 text-center text-slate-400">
+                            <i class="ph ph-spinner-gap text-5xl mb-3 block text-indigo-400 animate-spin w-max mx-auto"></i>
+                            <p class="font-medium">Memuat data dari server...</p>
+                        </td>
+                    </tr>`;
+                
+                // Sembunyikan banner selagi memuat
+                document.getElementById('expiredBanner').classList.add('hidden');
+                document.getElementById('expiredBanner').classList.remove('flex');
+
+                const res = await sendToGas({ action: 'getAllData' });
+                
+                if (res.status === 'success') {
+                    currentData = res.data;
+                    renderTable();
+                } else {
+                    showAlert(res.message || 'Gagal memuat data', 'error');
+                }
+            } catch (err) {
+                showAlert(err.message, 'error');
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            let expiredCount = 0;
+
+            if (currentData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-16 text-center text-slate-500">
+                    <div class="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100 shadow-sm">
+                        <i class="ph ph-database text-3xl text-slate-400"></i>
+                    </div>
+                    <p class="font-medium text-base">Data masih kosong.</p>
+                </td></tr>`;
+                return;
+            }
+
+            currentData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                
+                // Logika Tanggal
+                let dateValForInput = '';
+                let formattedDate = row.kolomE || '-';
+                let isExpired = false;
+
+                const dateObj = parseDateData(row.kolomE);
+                if (dateObj) {
+                    const dd = String(dateObj.getDate()).padStart(2, '0');
+                    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const yyyy = dateObj.getFullYear();
+                    formattedDate = `${dd}/${mm}/${yyyy}`;
+                    dateValForInput = `${yyyy}-${mm}-${dd}`; // Untuk <input type="date">
+                    
+                    // Cek jika sudah lewat atau hari ini
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const compareDate = new Date(dateObj);
+                    compareDate.setHours(0,0,0,0);
+                    
+                    if (compareDate <= today) {
+                        isExpired = true;
+                        expiredCount++;
+                    }
+                }
+
+                tr.id = `row-${index}`;
+                tr.className = isExpired 
+                    ? "bg-red-50/40 hover:bg-red-50/80 transition-colors group" 
+                    : "hover:bg-indigo-50/40 transition-colors group";
+                
+                const badgeClass = isExpired 
+                    ? "text-red-700 bg-red-100 border-red-200" 
+                    : "text-indigo-700 bg-indigo-100/70 border-indigo-200";
+
+                const expiredTag = isExpired 
+                    ? `<span class="ml-2 text-[10px] bg-red-500 text-white px-2 py-0.5 rounded uppercase tracking-wider font-bold shadow-sm">Habis</span>` 
+                    : '';
+
+                tr.innerHTML = `
+                    <td class="p-4 text-slate-400 font-medium text-center border-r border-slate-50/50">${row.row}</td>
+                    <td class="p-4"><div class="min-w-[120px] font-bold ${isExpired ? 'text-red-700 line-through opacity-60' : 'text-slate-700'}">${row.kolomA}</div></td>
+                    <td class="p-4"><div class="min-w-[120px] ${isExpired ? 'text-red-600 opacity-60' : 'text-slate-600'}">${row.kolomB}</div></td>
+                    <td class="p-4"><div class="min-w-[120px] ${isExpired ? 'text-red-600 opacity-60' : 'text-slate-600'}">${row.kolomC}</div></td>
+                    <td class="p-4"><div class="min-w-[120px] ${isExpired ? 'text-red-600 opacity-60' : 'text-slate-600'}">${row.kolomD}</div></td>
+                    <td class="p-4">
+                        <div class="flex items-center min-w-[140px]">
+                            <span class="inline-block font-semibold border px-3 py-1.5 rounded-lg ${badgeClass}">${formattedDate}</span>
+                            ${expiredTag}
+                        </div>
+                    </td>
+                    <td class="p-4">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="editRowUI(${index})" class="text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center gap-1.5 font-medium text-xs">
+                                <i class="ph ph-pencil-simple text-base"></i> Edit
+                            </button>
+                            <button onclick="deleteRow(${index}, ${row.row}, event)" class="text-red-600 hover:text-red-800 bg-white border border-red-100 hover:border-red-300 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center gap-1.5 font-medium text-xs">
+                                <i class="ph ph-trash text-base"></i> Hapus
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Tampilkan Banner jika ada yang Expired
+            const banner = document.getElementById('expiredBanner');
+            if (expiredCount > 0) {
+                document.getElementById('expiredCount').innerText = expiredCount;
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
+            }
+        }
+
+        function editRowUI(index) {
+            const row = currentData[index];
+            const tr = document.getElementById(`row-${index}`);
+            
+            // Siapkan input tanggal
+            let dateValForInput = '';
+            const dateObj = parseDateData(row.kolomE);
+            if(dateObj) {
+                const dd = String(dateObj.getDate()).padStart(2, '0');
+                const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const yyyy = dateObj.getFullYear();
+                dateValForInput = `${yyyy}-${mm}-${dd}`;
+            }
+
+            tr.className = "bg-indigo-50/50 ring-1 ring-inset ring-indigo-200 transition-colors";
+            tr.innerHTML = `
+                <td class="p-4 text-indigo-500 font-bold text-center">${row.row}</td>
+                <td class="p-2.5"><input type="text" id="edit-colA-${index}" value="${row.kolomA}" class="w-full p-2.5 text-sm bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm font-medium"></td>
+                <td class="p-2.5"><input type="text" id="edit-colB-${index}" value="${row.kolomB}" class="w-full p-2.5 text-sm bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm"></td>
+                <td class="p-2.5"><input type="text" id="edit-colC-${index}" value="${row.kolomC}" class="w-full p-2.5 text-sm bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm"></td>
+                <td class="p-2.5"><input type="text" id="edit-colD-${index}" value="${row.kolomD}" class="w-full p-2.5 text-sm bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm"></td>
+                <td class="p-2.5"><input type="date" id="edit-colE-${index}" value="${dateValForInput}" class="w-full p-2.5 text-sm bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm text-indigo-700 font-medium"></td>
+                <td class="p-2.5 text-center flex justify-center gap-2 mt-0.5">
+                    <button onclick="saveRow(${index}, ${row.row})" id="btnSave-${index}" class="text-white bg-emerald-500 hover:bg-emerald-600 p-2.5 rounded-xl transition-all shadow-sm active:scale-95" title="Simpan">
+                        <i class="ph ph-check-bold text-lg"></i>
+                    </button>
+                    <button onclick="renderTable()" class="text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:text-red-600 p-2.5 rounded-xl transition-all shadow-sm active:scale-95" title="Batal">
+                        <i class="ph ph-x-bold text-lg"></i>
+                    </button>
+                </td>
+            `;
+        }
+
+        function addNewRowUI() {
+            const tbody = document.getElementById('tableBody');
+            const newIndex = currentData.length; 
+            
+            const tr = document.createElement('tr');
+            tr.className = "bg-emerald-50/50 ring-1 ring-inset ring-emerald-200 transition-colors";
+            tr.innerHTML = `
+                <td class="p-4 text-[11px] text-emerald-600 font-bold text-center tracking-widest uppercase">Baru</td>
+                <td class="p-2.5"><input type="text" id="edit-colA-${newIndex}" placeholder="Akun..." class="w-full p-2.5 text-sm bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"></td>
+                <td class="p-2.5"><input type="text" id="edit-colB-${newIndex}" placeholder="Isi Kolom B..." class="w-full p-2.5 text-sm bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"></td>
+                <td class="p-2.5"><input type="text" id="edit-colC-${newIndex}" placeholder="Isi Kolom C..." class="w-full p-2.5 text-sm bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"></td>
+                <td class="p-2.5"><input type="text" id="edit-colD-${newIndex}" placeholder="Isi Kolom D..." class="w-full p-2.5 text-sm bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"></td>
+                <td class="p-2.5"><input type="date" id="edit-colE-${newIndex}" class="w-full p-2.5 text-sm bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm text-emerald-700 font-medium"></td>
+                <td class="p-2.5 text-center flex justify-center gap-2 mt-0.5">
+                    <button onclick="saveRow(${newIndex}, 0)" id="btnSave-${newIndex}" class="text-white bg-emerald-500 hover:bg-emerald-600 p-2.5 rounded-xl transition-all shadow-sm active:scale-95" title="Simpan Baru">
+                        <i class="ph ph-check-bold text-lg"></i>
+                    </button>
+                    <button onclick="renderTable()" class="text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:text-red-600 p-2.5 rounded-xl transition-all shadow-sm active:scale-95" title="Batal">
+                        <i class="ph ph-x-bold text-lg"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        async function saveRow(index, spreadsheetRow) {
+            const btnSave = document.getElementById(`btnSave-${index}`);
+            
+            const colA = document.getElementById(`edit-colA-${index}`).value;
+            const colB = document.getElementById(`edit-colB-${index}`).value;
+            const colC = document.getElementById(`edit-colC-${index}`).value;
+            const colD = document.getElementById(`edit-colD-${index}`).value;
+            let colE = document.getElementById(`edit-colE-${index}`).value;
+
+            // Format tanggal kembali ke DD/MM/YYYY sebelum disimpan
+            if (colE && colE.includes('-')) {
+                const parts = colE.split('-');
+                if (parts.length === 3) {
+                    colE = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+            }
+
+            try {
+                btnSave.innerHTML = '<div class="loader" style="width:16px; height:16px;"></div>';
+                btnSave.disabled = true;
+
+                const payload = {
+                    action: 'updateRow',
+                    row: spreadsheetRow,
+                    kolomA: colA,
+                    kolomB: colB,
+                    kolomC: colC,
+                    kolomD: colD,
+                    kolomE: colE
+                };
+
+                const res = await sendToGas(payload);
+
+                if (res.status === 'success') {
+                    showAlert('Data berhasil disimpan!');
+                    loadData(); 
+                } else {
+                    showAlert('Gagal menyimpan data', 'error');
+                    renderTable(); 
+                }
+            } catch (err) {
+                showAlert(err.message, 'error');
+                renderTable();
+            }
+        }
+
+        // --- FUNGSI HAPUS 1 BARIS ---
+        async function deleteRow(index, spreadsheetRow, event) {
+            if (!confirm('Yakin ingin menghapus data ini secara permanen?')) return;
+            
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<div class="loader" style="width:14px; height:14px; border-width:2px; border-color:#ef4444; border-top-color:transparent;"></div>';
+            btn.disabled = true;
+
+            try {
+                // Menimpa baris dengan data kosong akan membuatnya tidak terbaca lagi (Terhapus)
+                const payload = {
+                    action: 'updateRow',
+                    row: spreadsheetRow,
+                    kolomA: '', kolomB: '', kolomC: '', kolomD: '', kolomE: ''
+                };
+                const res = await sendToGas(payload);
+                if (res.status === 'success') {
+                    showAlert('Data berhasil dihapus.');
+                    loadData();
+                } else {
+                    showAlert('Gagal menghapus data', 'error');
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                showAlert(e.message, 'error');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+
+        // --- FUNGSI HAPUS OTOMATIS DATA KADALUARSA ---
+        async function autoCleanExpired() {
+            if(!confirm('Yakin ingin menghapus SEMUA baris yang waktunya telah habis secara otomatis?')) return;
+            
+            const btn = document.getElementById('btnCleanExpired');
+            btn.innerHTML = '<div class="loader" style="width:16px;height:16px;border-color:#fff;border-top-color:transparent;"></div> Memproses...';
+            btn.disabled = true;
+            
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            let successCount = 0;
+            
+            // Filter baris yang kadaluarsa
+            const expiredRows = currentData.filter(row => {
+                const dateObj = parseDateData(row.kolomE);
+                if(dateObj) {
+                    const comp = new Date(dateObj);
+                    comp.setHours(0,0,0,0);
+                    return comp <= today;
+                }
+                return false;
+            });
+            
+            // Hapus satu per satu
+            for(const row of expiredRows) {
+                const payload = {
+                    action: 'updateRow',
+                    row: row.row,
+                    kolomA: '', kolomB: '', kolomC: '', kolomD: '', kolomE: ''
+                };
+                try {
+                    await sendToGas(payload);
+                    successCount++;
+                } catch(e) {
+                    console.error("Gagal hapus baris " + row.row);
+                }
+            }
+            
+            showAlert(`Selesai! Berhasil menghapus ${successCount} baris kadaluarsa.`);
+            loadData();
+        }
+    </script>
+</body>
+</html>
