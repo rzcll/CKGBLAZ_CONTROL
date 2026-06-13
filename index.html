@@ -12,6 +12,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- HTML2PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #e2e8f0; }
         .loader { border: 3px solid #e2e8f0; border-top: 3px solid #4f46e5; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
@@ -50,6 +52,54 @@
         </div>
     </div>
 
+    <!-- Modal Form Invoice -->
+    <div id="invoiceModal" class="fixed inset-0 z-[110] hidden items-center justify-center bg-slate-800/60 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 transform scale-100 transition-transform">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="bg-emerald-100 p-2 rounded-xl text-emerald-600">
+                        <i class="ph ph-receipt text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800">Cetak Invoice</h3>
+                </div>
+                <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-red-500 transition-colors focus:outline-none">
+                    <i class="ph ph-x-circle text-3xl"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nama Puskesmas / Akun</label>
+                    <input type="text" id="invPuskesmas" placeholder="Contoh: Puskesmas Sumbersekar" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-700 font-bold">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Paket yang Dipilih</label>
+                    <!-- Dropdown Paket -->
+                    <select id="invPaket" onchange="updateInvoicePrice()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-700 appearance-none cursor-pointer">
+                        <option value="" disabled selected>-- Pilih Paket Berlangganan --</option>
+                        <option value="1">Paket 1 Bulan</option>
+                        <option value="2">Paket 2 Bulan</option>
+                        <option value="4">Paket 4 Bulan</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Biaya Dibayar (Rp)</label>
+                    <!-- Input Biaya Otomatis dan Terkunci (Readonly) -->
+                    <input type="number" id="invBiaya" placeholder="Otomatis terisi..." readonly class="w-full p-3 bg-slate-100 border border-slate-300 rounded-xl outline-none text-emerald-700 font-bold cursor-not-allowed">
+                </div>
+                <input type="hidden" id="invRowNumber" value="">
+            </div>
+            <div class="mt-8 flex justify-end gap-3">
+                <button onclick="closeInvoiceModal()" class="px-5 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold transition-colors active:scale-95">Batal</button>
+                <button id="btnDownloadPdf" onclick="generateInvoice('download')" class="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white rounded-xl font-bold transition-all shadow hover:shadow-lg active:scale-95 flex items-center gap-2">
+                    <i class="ph ph-file-pdf"></i> Unduh PDF
+                </button>
+                <button onclick="generateInvoice('print')" class="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold transition-all shadow hover:shadow-lg active:scale-95 flex items-center gap-2">
+                    <i class="ph ph-printer"></i> Cetak
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Navbar -->
     <nav class="glass-nav text-white shadow-lg p-4 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
@@ -57,7 +107,7 @@
                 <div class="bg-white/20 p-2 rounded-xl backdrop-blur-sm shadow-inner">
                     <i class="ph ph-database text-2xl"></i>
                 </div>
-                <h1 class="text-xl font-bold tracking-wide">DataSpace<span class="font-normal opacity-80 text-sm ml-2 hidden md:inline">Management Dashboard</span></h1>
+                <h1 class="text-xl font-bold tracking-wide">CKG BLAZ<span class="font-normal opacity-80 text-sm ml-2 hidden md:inline">Management Dashboard</span></h1>
             </div>
             <div class="flex items-center gap-2 text-sm font-semibold bg-white/10 px-4 py-2 rounded-full border border-white/20 shadow-sm">
                 <span class="relative flex h-2.5 w-2.5">
@@ -98,10 +148,12 @@
                     <h2 class="text-lg font-bold text-slate-800">Tabel Data Spreadsheet</h2>
                     <p class="text-sm text-slate-600">Kelola dan update data secara real-time</p>
                 </div>
-                <button onclick="addNewRowUI()" 
-                        class="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 shadow hover:shadow-md active:scale-95 outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                    <i class="ph ph-plus-circle text-xl"></i> Tambah Baris Baru
-                </button>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button onclick="addNewRowUI()" 
+                            class="flex-1 sm:flex-none bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow hover:shadow-md active:scale-95 outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
+                        <i class="ph ph-plus-circle text-xl"></i> Tambah Baris Baru
+                    </button>
+                </div>
             </div>
             
             <div class="overflow-x-auto pb-12">
@@ -135,9 +187,6 @@
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbya7z3VYbd6gGpLkw2OxCH8U8I3bxuJBf2Zgjhb_cYFgr1mAKwqA0FGvRSEp8Uq_Owo_Q/exec';
         let currentData = [];
 
-        // Hapus pemanggilan otomatis loadData() karena akan dipanggil setelah login berhasil
-        // document.addEventListener("DOMContentLoaded", loadData);
-
         // --- FUNGSI LOGIN ADMIN ---
         async function handleLogin() {
             const username = document.getElementById('loginUsername').value.trim();
@@ -162,12 +211,11 @@
                 });
 
                 if (res.status === 'success') {
-                    // Berhasil login: Fade out layar login lalu muat data tabel
                     const overlay = document.getElementById('loginOverlay');
                     overlay.style.opacity = '0';
                     setTimeout(() => {
                         overlay.remove();
-                        loadData(); // Panggil data setelah layar login tertutup
+                        loadData(); 
                     }, 300);
                 } else {
                     alert.innerText = res.message || "Username tidak valid!";
@@ -183,6 +231,322 @@
             }
         }
 
+        // --- FUNGSI INVOICE ---
+        function openInvoiceModal(index) {
+            const modal = document.getElementById('invoiceModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Auto-fill nama puskesmas dari tabel
+            if (index !== undefined && currentData[index]) {
+                document.getElementById('invPuskesmas').value = currentData[index].kolomA;
+                document.getElementById('invRowNumber').value = currentData[index].row;
+            } else {
+                document.getElementById('invPuskesmas').value = '';
+                document.getElementById('invRowNumber').value = '';
+            }
+            
+            document.getElementById('invPaket').value = '';
+            document.getElementById('invBiaya').value = '';
+        }
+
+        function updateInvoicePrice() {
+            const paket = document.getElementById('invPaket').value;
+            const biayaInput = document.getElementById('invBiaya');
+            
+            if (paket === '1') {
+                biayaInput.value = '150000';
+            } else if (paket === '2') {
+                biayaInput.value = '250000';
+            } else if (paket === '4') {
+                biayaInput.value = '400000';
+            } else {
+                biayaInput.value = '';
+            }
+        }
+
+        function closeInvoiceModal() {
+            const modal = document.getElementById('invoiceModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            
+            document.getElementById('invPuskesmas').value = '';
+            document.getElementById('invPaket').value = '';
+            document.getElementById('invBiaya').value = '';
+            document.getElementById('invRowNumber').value = '';
+        }
+
+        function generateInvoice(action) {
+            const puskesmas = document.getElementById('invPuskesmas').value.trim();
+            const paketSelect = document.getElementById('invPaket');
+            const paketValue = paketSelect.value;
+            const biaya = document.getElementById('invBiaya').value.trim();
+
+            if (!puskesmas || !paketValue || !biaya) {
+                showAlert('Harap isi/pilih semua informasi (Puskesmas, Paket, dan Biaya) pada form invoice!', 'error');
+                return;
+            }
+
+            const paketText = paketSelect.options[paketSelect.selectedIndex].text;
+            const bulan = parseInt(paketValue);
+
+            // Generate tanggal
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+            
+            // Generate Tanggal Expiry Otomatis sesuai paket
+            const expiryDate = new Date();
+            expiryDate.setMonth(expiryDate.getMonth() + bulan);
+            const expiryStr = expiryDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            // Generate Doc Number menggunakan No Row dari Spreadsheet
+            const yy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const rowNumber = document.getElementById('invRowNumber').value || "0";
+            const paddedRow = String(rowNumber).padStart(4, '0');
+            const invNumber = `INV-${yy}${mm}-${paddedRow}`;
+            
+            // Format Rupiah
+            const formattedBiaya = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(biaya);
+
+            // Sanitize file name
+            const safeFileName = puskesmas.replace(/[^a-zA-Z0-9 -]/g, '');
+
+            // Styling Eksternal & Internal Template (Digabung)
+            const styleBlock = `
+                <style>
+                    #invoice-template { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #222; max-width: 800px; margin: 0 auto; padding: 40px; position: relative; background: white;}
+                    #invoice-template .watermark { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 110px; color: rgba(34, 197, 94, 0.08); border: 12px solid rgba(34, 197, 94, 0.08); border-radius: 50%; padding: 40px 60px; font-weight: 900; z-index: 1; pointer-events: none; text-transform: uppercase; letter-spacing: 5px; }
+                    #invoice-template .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; position: relative; z-index: 2;}
+                    #invoice-template .header-left .logo-url { font-size: 12px; font-weight: bold; color: #64748b; letter-spacing: 1.5px; margin-bottom: 25px; display: inline-block; border-bottom: 2px solid #cbd5e1; padding-bottom: 4px; }
+                    #invoice-template .header-left .doc-type { font-size: 14px; font-weight: 800; color: #475569; letter-spacing: 1.5px; }
+                    #invoice-template .header-right { text-align: right; }
+                    #invoice-template .doc-number-label { font-size: 12px; color: #64748b; letter-spacing: 1px; margin-bottom: 2px; }
+                    #invoice-template .doc-number { font-size: 28px; font-weight: 900; color: #0f172a; margin-bottom: 15px; }
+                    #invoice-template .status-container { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-bottom: 10px; }
+                    #invoice-template .status-label { font-size: 13px; color: #64748b; }
+                    #invoice-template .status-badge { background-color: #22c55e; color: white; padding: 4px 12px; font-weight: bold; border-radius: 4px; font-size: 14px; letter-spacing: 1px; }
+                    #invoice-template .print-info { font-size: 11px; color: #94a3b8; }
+                    #invoice-template .print-info strong { color: #475569; }
+                    #invoice-template .info-grid { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 35px; border-top: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0; padding: 15px 0; position: relative; z-index: 2;}
+                    #invoice-template .info-grid div { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+                    #invoice-template .info-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
+                    #invoice-template .info-value { font-size: 13px; font-weight: 600; color: #0f172a; }
+                    #invoice-template .billing-container { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; z-index: 2;}
+                    #invoice-template .billing-box { width: 45%; }
+                    #invoice-template .billing-title { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px; }
+                    #invoice-template .billing-name { font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 5px; }
+                    #invoice-template .billing-detail { font-size: 13px; color: #475569; line-height: 1.5; }
+                    #invoice-template .billing-detail strong { color: #1e293b; }
+                    #invoice-template table { width: 100%; border-collapse: collapse; margin-bottom: 30px; position: relative; z-index: 2;}
+                    #invoice-template th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 12px; text-align: left; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; }
+                    #invoice-template td { padding: 16px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; font-size: 13px; color: #1e293b; line-height: 1.6; }
+                    #invoice-template .text-right { text-align: right; }
+                    #invoice-template .item-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+                    #invoice-template .item-desc { color: #64748b; font-size: 12px; }
+                    #invoice-template .status-text { font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; }
+                    #invoice-template .footer-container { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 20px; position: relative; z-index: 2;}
+                    #invoice-template .terms { width: 50%; font-size: 11px; color: #64748b; line-height: 1.6; }
+                    #invoice-template .terms-title { font-weight: 700; color: #475569; margin-bottom: 5px; display: block; }
+                    #invoice-template .totals-box { width: 40%; }
+                    #invoice-template .signature { text-align: right; margin-bottom: 30px; }
+                    #invoice-template .signature-title { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+                    #invoice-template .signature-role { font-size: 11px; color: #64748b; }
+                    #invoice-template .totals-table { width: 100%; border-collapse: collapse; }
+                    #invoice-template .totals-table td { padding: 10px 0; border: none; font-size: 14px; }
+                    #invoice-template .totals-table tr.subtotal td { border-bottom: 1px solid #cbd5e1; color: #475569; }
+                    #invoice-template .totals-table tr.total td { font-size: 18px; font-weight: 800; color: #0f172a; padding-top: 15px; }
+                </style>
+            `;
+
+            // Struktur HTML Invoice Body
+            const bodyContent = `
+                <div id="invoice-template">
+                    <!-- Watermark Lunas -->
+                    <div class="watermark">LUNAS</div>
+
+                    <div class="header">
+                        <div class="header-left">
+                            <img src="https://raw.githubusercontent.com/rzcll/CKGBLAZ/main/logo%20ckg%20blaz.png" crossorigin="anonymous" alt="CKG BLAZ Logo" style="height: 48px; margin-bottom: 8px; display: block; object-fit: contain;">
+                            <div class="logo-url">WWW.CKGBLAZ.SITE</div>
+                            <div class="doc-type">BUKTI PEMBAYARAN ELEKTRONIK</div>
+                        </div>
+                        <div class="header-right">
+                            <div class="doc-number-label">NOMOR DOKUMEN</div>
+                            <div class="doc-number">${invNumber}</div>
+                            <div class="status-container">
+                                <span class="status-label">Status Pembayaran</span>
+                                <span class="status-badge">LUNAS</span>
+                            </div>
+                            <div class="print-info">Dicetak Otomatis via: <strong>Sistem Pusat</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="info-grid">
+                        <div>
+                            <span class="info-label">Tanggal Terbit</span>
+                            <span class="info-value">${dateStr}</span>
+                        </div>
+                        <div>
+                            <span class="info-label">Expiry Date</span>
+                            <span class="info-value">${expiryStr}</span>
+                        </div>
+                        <div>
+                            <span class="info-label">Metode Bayar</span>
+                            <span class="info-value">Transfer Bank</span>
+                        </div>
+                        <div>
+                            <span class="info-label">Mata Uang</span>
+                            <span class="info-value">IDR (Rupiah)</span>
+                        </div>
+                    </div>
+
+                    <div class="billing-container">
+                        <div class="billing-box">
+                            <div class="billing-title">Ditagihkan Kepada:</div>
+                            <div class="billing-name">${puskesmas}</div>
+                        </div>
+                        <div class="billing-box text-right">
+                            <div class="billing-title">Rekening Penerima Resmi:</div>
+                            <div class="billing-detail" style="font-size: 15px; margin-bottom: 4px;"><strong>BANK BNI : 1743464777</strong></div>
+                            <div class="billing-detail">An. Mohammad Ali Agustin</div>
+                        </div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Deskripsi Produk & Layanan</th>
+                                <th>Status</th>
+                                <th class="text-right">Tarif</th>
+                                <th class="text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <div class="item-title">CKGBLAZ - ${paketText}</div>
+                                    <div class="item-desc">Aktivasi Lisensi Penggunaan Platform<br>Cloud Infrastructure & Management</div>
+                                </td>
+                                <td>
+                                    <div class="status-text">KONTRAK ${bulan} BULAN</div>
+                                </td>
+                                <td class="text-right font-semibold">${formattedBiaya}</td>
+                                <td class="text-right font-semibold">${formattedBiaya}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="footer-container">
+                        <div class="terms">
+                            <span class="terms-title">Syarat & Ketentuan Lisensi:</span>
+                            Terima kasih atas kerja sama Anda dalam membangun ekosistem digital bersama CKG BLAZ. Layanan Anda dikelola secara terpusat oleh sistem dan akan diperbarui sesuai ketentuan kontrak yang berlaku.
+                        </div>
+                        <div class="totals-box">
+                            <div class="signature">
+                                <div class="signature-title">Digital Signature</div>
+                                <img src="https://raw.githubusercontent.com/rzcll/CKGBLAZ_CONTROL/main/qrcode_362239270_f8a504a718c8dab4fcf18dc9ebc40cf4.png" crossorigin="anonymous" alt="QR Code Signature" style="width: 70px; height: 70px; display: inline-block; margin-bottom: 8px;">
+                                <div class="signature-role">HEAD OF CKG BLAZ APPS.</div>
+                            </div>
+                            <table class="totals-table">
+                                <tr class="subtotal">
+                                    <td>Subtotal Layanan</td>
+                                    <td class="text-right">${formattedBiaya}</td>
+                                </tr>
+                                <tr class="total">
+                                    <td>TOTAL TAGIHAN</td>
+                                    <td class="text-right">${formattedBiaya}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (action === 'print') {
+                // Cetak Biasa via Browser Print (Sangat Akurat)
+                const printContent = `
+                    <!DOCTYPE html>
+                    <html lang="id">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>${safeFileName}</title>
+                        ${styleBlock}
+                    </head>
+                    <body>
+                        ${bodyContent}
+                        <script>
+                            window.onload = function() {
+                                setTimeout(() => { window.print(); }, 500);
+                            }
+                        <\/script>
+                    </body>
+                    </html>
+                `;
+
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(printContent);
+                printWindow.document.close();
+                closeInvoiceModal();
+                
+            } else if (action === 'download') {
+                // Unduh Langsung via html2pdf
+                const btn = document.getElementById('btnDownloadPdf');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="ph ph-spinner-gap animate-spin"></i> Proses...';
+                btn.disabled = true;
+
+                // Buat container HTML tersembunyi
+                const tempContainer = document.createElement('div');
+                tempContainer.innerHTML = styleBlock + bodyContent;
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.top = '-9999px';
+                tempContainer.style.left = '0';
+                tempContainer.style.width = '800px'; 
+                document.body.appendChild(tempContainer);
+
+                const element = tempContainer.querySelector('#invoice-template');
+
+                // Tunggu semua gambar selesai dimuat sebelum merender PDF
+                const images = element.querySelectorAll('img');
+                const imagePromises = Array.from(images).map(img => {
+                    return new Promise(resolve => {
+                        if (img.complete) {
+                            resolve();
+                        } else {
+                            img.onload = resolve;
+                            img.onerror = resolve; // Lanjut meskipun error agar tidak macet
+                        }
+                    });
+                });
+
+                Promise.all(imagePromises).then(() => {
+                    // Konfigurasi PDF
+                    const opt = {
+                        margin:       [10, 0],
+                        filename:     `${safeFileName}.pdf`,
+                        image:        { type: 'jpeg', quality: 1 },
+                        html2canvas:  { scale: 2, useCORS: true, logging: false },
+                        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+
+                    // Eksekusi Generate File PDF
+                    html2pdf().set(opt).from(element).save().then(() => {
+                        document.body.removeChild(tempContainer);
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                        closeInvoiceModal();
+                    }).catch(err => {
+                        console.error('Error:', err);
+                        showAlert('Gagal mengunduh PDF. Silakan coba menu Cetak.', 'error');
+                        document.body.removeChild(tempContainer);
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    });
+                });
+            }
+        }
+
         // --- FUNGSI PARSING & FORMAT TANGGAL ---
         function parseDateData(rawDate) {
             if (!rawDate) return null;
@@ -192,9 +556,9 @@
             if (typeof rawDate === 'string') {
                 const parts = rawDate.split(/[\/\-]/);
                 if (parts.length === 3) {
-                    if (parts[2].length === 4) { // Asumsi DD/MM/YYYY
+                    if (parts[2].length === 4) { 
                         d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
-                    } else if (parts[0].length === 4) { // Asumsi YYYY-MM-DD
+                    } else if (parts[0].length === 4) { 
                         d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
                     }
                     if (!isNaN(d.getTime())) return d;
@@ -231,7 +595,6 @@
                         </td>
                     </tr>`;
                 
-                // Sembunyikan banner selagi memuat
                 document.getElementById('expiredBanner').classList.add('hidden');
                 document.getElementById('expiredBanner').classList.remove('flex');
 
@@ -266,7 +629,6 @@
             currentData.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 
-                // Logika Tanggal
                 let dateValForInput = '';
                 let formattedDate = row.kolomE || '-';
                 let isExpired = false;
@@ -277,9 +639,8 @@
                     const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
                     const yyyy = dateObj.getFullYear();
                     formattedDate = `${dd}/${mm}/${yyyy}`;
-                    dateValForInput = `${yyyy}-${mm}-${dd}`; // Untuk <input type="date">
+                    dateValForInput = `${yyyy}-${mm}-${dd}`; 
                     
-                    // Cek jika sudah lewat atau hari ini
                     const today = new Date();
                     today.setHours(0,0,0,0);
                     const compareDate = new Date(dateObj);
@@ -318,6 +679,10 @@
                     </td>
                     <td class="p-4">
                         <div class="flex justify-center gap-2">
+                            <!-- Tombol Cetak -->
+                            <button onclick="openInvoiceModal(${index})" class="text-emerald-600 hover:text-emerald-800 bg-slate-50 border border-emerald-200 hover:border-emerald-300 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-all shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center gap-1.5 font-medium text-xs">
+                                <i class="ph ph-printer text-base"></i> Cetak
+                            </button>
                             <button onclick="editRowUI(${index})" class="text-indigo-600 hover:text-indigo-800 bg-slate-50 border border-indigo-200 hover:border-indigo-300 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-all shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center gap-1.5 font-medium text-xs">
                                 <i class="ph ph-pencil-simple text-base"></i> Edit
                             </button>
@@ -330,12 +695,10 @@
                 tbody.appendChild(tr);
             });
 
-            // Tampilkan Banner jika ada yang Expired
-            const banner = document.getElementById('expiredBanner');
             if (expiredCount > 0) {
                 document.getElementById('expiredCount').innerText = expiredCount;
-                banner.classList.remove('hidden');
-                banner.classList.add('flex');
+                document.getElementById('expiredBanner').classList.remove('hidden');
+                document.getElementById('expiredBanner').classList.add('flex');
             }
         }
 
@@ -343,7 +706,6 @@
             const row = currentData[index];
             const tr = document.getElementById(`row-${index}`);
             
-            // Siapkan input tanggal
             let dateValForInput = '';
             const dateObj = parseDateData(row.kolomE);
             if(dateObj) {
@@ -407,7 +769,6 @@
             const colD = document.getElementById(`edit-colD-${index}`).value;
             let colE = document.getElementById(`edit-colE-${index}`).value;
 
-            // Format tanggal kembali ke DD/MM/YYYY sebelum disimpan
             if (colE && colE.includes('-')) {
                 const parts = colE.split('-');
                 if (parts.length === 3) {
@@ -444,7 +805,6 @@
             }
         }
 
-        // --- FUNGSI HAPUS 1 BARIS ---
         async function deleteRow(index, spreadsheetRow, event) {
             if (!confirm('Yakin ingin menghapus data ini secara permanen?')) return;
             
@@ -454,7 +814,6 @@
             btn.disabled = true;
 
             try {
-                // Menimpa baris dengan data kosong akan membuatnya tidak terbaca lagi (Terhapus)
                 const payload = {
                     action: 'updateRow',
                     row: spreadsheetRow,
@@ -476,7 +835,6 @@
             }
         }
 
-        // --- FUNGSI HAPUS OTOMATIS DATA KADALUARSA ---
         async function autoCleanExpired() {
             if(!confirm('Yakin ingin menghapus SEMUA baris yang waktunya telah habis secara otomatis?')) return;
             
@@ -489,7 +847,6 @@
             
             let successCount = 0;
             
-            // Filter baris yang kadaluarsa
             const expiredRows = currentData.filter(row => {
                 const dateObj = parseDateData(row.kolomE);
                 if(dateObj) {
@@ -500,7 +857,6 @@
                 return false;
             });
             
-            // Hapus satu per satu
             for(const row of expiredRows) {
                 const payload = {
                     action: 'updateRow',
